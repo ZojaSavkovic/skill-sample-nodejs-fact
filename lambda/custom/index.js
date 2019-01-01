@@ -2,17 +2,17 @@
 /* eslint-disable  no-console */
 
 const Alexa = require('ask-sdk');
-var http = require('http');
+var https = require('https');
 
-async function httpGet(query) {
+async function httpsGet(queryPath) {
   return new Promise ( (resolve, reject) => {
     var options = {
-        host: 'numbersapi.com',
-        path: '/' + encodeURIComponent(query),
+        host: 'api.willyweather.com.au',
+        path: '/v2/{apikey}' + queryPath,
         method: 'GET',
     };
 
-    var req = http.request(options, res => {
+    var req = https.request(options, res => {
         res.setEncoding('utf8');
         var responseString = "";
         
@@ -32,20 +32,44 @@ async function httpGet(query) {
   })
 }
 
+const LaunchHandler = {
+  canHandle(handlerInput) {
+    const request = handlerInput.requestEnvelope.request;
+    return request.type === 'LaunchRequest';
+  },
+  handle(handlerInput) {
+    return handlerInput.responseBuilder
+      .speak('Which suburb would you like a forecast for?')
+      .getResponse();
+  },
+};
+
 const GetNewFactHandler = {
   canHandle(handlerInput) {
     const request = handlerInput.requestEnvelope.request;
-    return request.type === 'LaunchRequest'
-      || (request.type === 'IntentRequest'
-        && request.intent.name === 'GetNewFactIntent');
+    return request.type === 'IntentRequest'  && request.intent.name === 'GetNewFactIntent';
   },
   async handle(handlerInput) {
     
-    const numberInput = handlerInput.requestEnvelope.request.intent.slots.numberSaid.value;
+    //convert spoken place to cityID
+    const cityInput = handlerInput.requestEnvelope.request.intent.slots.citySaid.value;
+    var locationString = await httpsGet('/search.json?query='+cityInput);
+    var locationJSON = JSON.parse(locationString);
+    var cityId = locationJSON[0].id;
+    console.log("cityID is: " + cityId);
+    
+    //use cityID to get forecast:
+    var todaysDate = new Date().toJSON().slice(0,10);
+    var rainForecastString = await httpsGet('/locations/'+cityId+'/weather.json?forecasts=rainfall&days=1&startDate='+todaysDate);
+    
+    var rainForecastJSON = JSON.parse(rainForecastString);
+    var rainForecast = rainForecastJSON.forecasts.rainfall.days[0].entries[0];
 
-    var query = parseInt(numberInput);
-    console.log("the number " + query);
-    var speechOutput = await httpGet(query);
+    var speechOutput = 'In ' + cityInput + ' there is a ' + rainForecast.probability + ' percent chance of any rain for today. ';
+    if (rainForecast.probability != 0){
+      speechOutput = speechOutput + 'Thats with a 50 percent chance of ' + (rainForecast.startRange ? rainForecast.startRange : 0 ) + ' millimitres. And a 25 percent chance of ' 
+      + rainForecast.endRange + ' millimitres.';
+    }
 
     return handlerInput.responseBuilder
                    .speak(speechOutput)
@@ -108,9 +132,9 @@ const ErrorHandler = {
   },
 };
 
-const SKILL_NAME = 'Dynamic Number Facts';
+const SKILL_NAME = 'Detailed rain';
 const GET_FACT_MESSAGE = 'Here\'s your fact: ';
-const HELP_MESSAGE = 'You can say tell me a number fact, or, you can say exit... What can I help you with?';
+const HELP_MESSAGE = 'You can say tell me a city or suburb, or, you can say exit... What can I help you with?';
 const HELP_REPROMPT = 'What can I help you with?';
 const STOP_MESSAGE = 'Goodbye!';
 
@@ -118,6 +142,7 @@ const skillBuilder = Alexa.SkillBuilders.standard();
 
 exports.handler = skillBuilder
   .addRequestHandlers(
+    LaunchHandler,
     GetNewFactHandler,
     HelpHandler,
     ExitHandler,

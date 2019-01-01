@@ -1,7 +1,7 @@
 {
     "interactionModel": {
         "languageModel": {
-            "invocationName": "dynamic number facts",
+            "invocationName": "detailed rain",
             "intents": [
                 {
                     "name": "AMAZON.CancelIntent",
@@ -23,12 +23,13 @@
                     "name": "GetNewFactIntent",
                     "slots": [
                         {
-                            "name": "numberSaid",
-                            "type": "AMAZON.NUMBER"
+                            "name": "citySaid",
+                            "type": "AMAZON.US_CITY"
                         }
                     ],
                     "samples": [
-                        "ask dynamic number facts for a fact about  {numberSaid}"
+                        "for {citySaid}",
+                        "{citySaid}"
                     ]
                 },
                 {
